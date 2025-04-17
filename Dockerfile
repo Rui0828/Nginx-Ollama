@@ -1,6 +1,4 @@
 FROM openresty/openresty:alpine
 
+# Remove default configuration
 RUN rm -f /etc/nginx/conf.d/default.conf
-
-COPY conf.d /etc/nginx/conf.d
-COPY ollama /etc/nginx/ollama

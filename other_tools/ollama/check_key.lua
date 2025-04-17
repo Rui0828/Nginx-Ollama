@@ -1,6 +1,6 @@
 -- /etc/nginx/ollama/check_key.lua
 local function read_keys()
-    local file = io.open("/etc/nginx/ollama/keys.txt", "r")
+    local file = io.open("/etc/nginx/other_tools/ollama/keys.txt", "r")
     if not file then
       ngx.log(ngx.ERR, "Failed to open keys.txt")
       return {}
@@ -22,4 +22,3 @@ local function read_keys()
     ngx.say("Forbidden: Invalid API Key")
     return ngx.exit(403)
   end
-  
