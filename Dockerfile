@@ -4,4 +4,4 @@ FROM openresty/openresty:alpine
 RUN mkdir -p /var/log/nginx/
 RUN rm -f /etc/nginx/conf.d/default.conf
 
-COPY nginx.conf /etc/nginx/nginx.conf
+COPY nginx.conf /usr/local/openresty/nginx/conf/nginx.conf
