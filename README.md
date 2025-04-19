@@ -1,4 +1,4 @@
-# Ollama-Nginx
+# Nginx-Ollama
 
 A secure proxy for Ollama API using Nginx with OpenResty, providing API key authentication.
 
