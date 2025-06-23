@@ -15,7 +15,7 @@ A containerized Nginx reverse proxy setup using OpenResty for managing Ollama se
 
 1. Clone this repository:
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/Rui0828/Nginx-Ollama.git
    cd Nginx-Ollama
    ```
 
