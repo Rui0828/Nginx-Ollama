@@ -1,139 +1,221 @@
-# Nginx‑Ollama (With OpenAI SDK Support)
+# Nginx-Ollama
 
-A secure proxy for Ollama API using Nginx with OpenResty, providing API key authentication and OpenAI SDK compatibility.
+A containerized Nginx reverse proxy setup using OpenResty for managing Ollama services.
 
-## 📌 Overview
+## Features
 
-This project sets up an Nginx reverse proxy with OpenResty to protect your Ollama API endpoints. It supports:
+- **OpenResty-based**: Built on OpenResty (Alpine) for enhanced performance and Lua scripting capabilities
+- **Configurable Proxy**: Easily configurable reverse proxy for Ollama API services
+- **Docker Compose Ready**: Simple deployment with Docker Compose
+- **Rate Limiting Support**: Built-in rate limiting configuration (commented out by default)
+- **Large File Support**: Configured to handle large model files up to 100MB
+- **Timezone Support**: Pre-configured for Asia/Taipei timezone
 
-- API key authentication via a simple text file
-- Compatibility with OpenAI SDK (`/chat/completions`, `/completions`, etc.)
-- Traditional Ollama API support (`/api/...`)
-- WebSocket support for streaming responses
-- Dockerized deployment
+## Quick Start
 
----
+1. Clone this repository:
+   ```bash
+   git clone <repository-url>
+   cd Nginx-Ollama
+   ```
 
-## ⚙️ Setup
+2. Create your Nginx configuration files in the `conf.d` directory:
+   ```bash
+   mkdir -p conf.d
+   ```
 
-1. Clone this repository.
-2. Create `ollama/keys.txt` and add your API keys (one per line):
-    ```
-    your_api_key_1
-    your_api_key_2
-    ```
-3. Start the proxy using Docker Compose:
-    ```bash
-    docker-compose up -d
-    ```
+3. Add your server configurations to `conf.d/` (see Configuration section below)
 
-## 🔐 Authentication
+4. Start the services:
+   ```bash
+   docker-compose up -d
+   ```
 
-All requests must include an API key. You can pass the key using the appropriate header based on the client:
+5. Access your services through `http://localhost:8080`
 
-- **OpenAI SDK style:**  
-  Use `Authorization: Bearer YOUR_KEY`
+## Configuration
 
-- **Direct API calls:**
-  Use `X-API-Key: YOUR_KEY` 
+### Directory Structure
+```
+├── Dockerfile
+├── docker-compose.yml
+├── nginx.conf
+├── conf.d/           # Your server configurations go here
+└── other_tools/      # Additional tools and scripts
+```
 
----
+### Adding Server Configurations
 
-## 🚀 Example Usage
+The project includes a pre-configured Ollama proxy with API key authentication. The main configuration is in `conf.d/ollama.conf` which proxies requests to `http://host.docker.internal:11434` through the `/ollama/` path.
 
-### 1. Using OpenAI SDK or OpenAI-style requests
+#### Example Usage
 
-#### Python OpenAI SDK Example
+```bash
+# Using X-API-Key header
+curl -H "X-API-Key: your-secret-key" http://localhost:8080/ollama/api/tags
 
+# Using Authorization Bearer token
+curl -H "Authorization: Bearer your-secret-key" http://localhost:8080/ollama/api/tags
+
+# Using query parameter
+curl "http://localhost:8080/ollama/api/tags?api_key=your-secret-key"
+```
+
+#### OpenAI API SDK Compatibility
+
+For using OpenAI API SDK or compatible clients, use the `/v1` endpoint:
+
+```bash
+# OpenAI API compatible endpoint
+curl -H "Authorization: Bearer your-secret-key" \
+     -H "Content-Type: application/json" \
+     -d '{"model": "llama2", "messages": [{"role": "user", "content": "Hello!"}]}' \
+     http://localhost:8080/ollama/v1/chat/completions
+```
+
+**Python Example with OpenAI SDK:**
 ```python
 from openai import OpenAI
 
 client = OpenAI(
-    api_key="your_api_key",
-    base_url="http://localhost:8080/ollama/"
+    base_url="http://localhost:8080/ollama/v1",
+    api_key="your-secret-key"
 )
 
 response = client.chat.completions.create(
-    model="llama3.2",
-    messages=[{"role": "user", "content": "Tell me a joke"}],
-    temperature=0.7,
-    max_tokens=150,
-    stop=["\n"]
+    model="llama2",
+    messages=[
+        {"role": "user", "content": "Hello, how are you?"}
+    ]
 )
-
 print(response.choices[0].message.content)
 ```
 
-#### Curl Example (OpenAI-Compatible)
-```bash
-curl http://localhost:8080/ollama/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer your_api_key" \
-  -d '{
-    "model": "llama3.2",
-    "messages": [{"role":"user","content":"Tell me a joke"}],
-    "temperature": 0.7,
-    "max_tokens": 150,
-    "stop": ["\n"]
-  }'
+## API Key Authentication
+
+This setup includes a robust API key authentication system for securing access to your Ollama services.
+
+### How It Works
+
+The authentication is implemented using OpenResty's Lua scripting capability through `check_key.lua`. It validates API keys against a whitelist stored in `other_tools/ollama/keys.txt`.
+
+### Supported Authentication Methods
+
+The system supports multiple ways to provide your API key:
+
+1. **X-API-Key Header** (recommended):
+   ```bash
+   curl -H "X-API-Key: your-secret-key" http://localhost:8080/ollama/api/tags
+   ```
+
+2. **Authorization Bearer Token**:
+   ```bash
+   curl -H "Authorization: Bearer your-secret-key" http://localhost:8080/ollama/api/tags
+   ```
+
+3. **Query Parameter**:
+   ```bash
+   curl "http://localhost:8080/ollama/api/tags?api_key=your-secret-key"
+   ```
+
+### Managing API Keys
+
+1. **Add/Remove Keys**: Edit the `other_tools/ollama/keys.txt` file:
+   ```
+   your-secret-key
+   abc123
+   supersecret
+   another-key-here
+   ```
+
+2. **Restart Required**: After modifying keys, restart the container:
+   ```bash
+   docker-compose restart nginx
+   ```
+
+3. **Security Best Practices**:
+   - Use strong, randomly generated keys
+   - Regularly rotate your API keys
+   - Keep the `keys.txt` file secure and backed up
+   - Consider using environment variables for production deployments
+
+### CORS Handling
+
+The authentication system automatically allows `OPTIONS` preflight requests to pass through without authentication, ensuring proper CORS support for web applications.
+
+### Error Responses
+
+- **401 Unauthorized**: Returned when no API key is provided or the key is invalid
+- **Error Message**: `"Unauthorized: Invalid or missing API Key"`
+
+## Configuration
+
+### Rate Limiting
+
+To enable rate limiting, uncomment the following line in `nginx.conf`:
+```nginx
+limit_req_zone $binary_remote_addr zone=api:10m rate=50r/s;
 ```
 
-### 2.  Using Native Ollama API (/api/generate)
-```bash
-curl http://localhost:8080/ollama/api/generate \
-  -H "Content-Type: application/json" \
-  -H "X-API-Key: your_api_key" \
-  -d '{
-    "model": "llama3.2",
-    "prompt": "Write a short poem.",
-    "stream": false,
-    "options": {
-      "temperature": 0.7,
-      "top_p": 0.9,
-      "num_predict": 100
-    }
-  }'
+Then add to your server block:
+```nginx
+limit_req zone=api burst=20 nodelay;
 ```
 
-## ✅ Feature Compatibility Table
+## Docker Configuration
 
-This table outlines which Ollama options are supported when using the OpenAI SDK format (via automatic Lua transformation):
+### Environment Variables
 
-| Ollama Option               | OpenAI SDK Support | Notes                                                           |
-|----------------------------|--------------------|------------------------------------------------------------------|
-| `temperature`              | ✅ Yes              | Directly supported                                              |
-| `top_k`                    | ✅ Yes              | Directly supported                                              |
-| `top_p`                    | ✅ Yes              | Directly supported                                              |
-| `presence_penalty`         | ✅ Yes              | Mapped directly                                                 |
-| `frequency_penalty`        | ✅ Yes              | Mapped directly                                                 |
-| `stop`                     | ✅ Yes              | Mapped directly                                                 |
-| `max_tokens` → `num_predict` | ✅ Yes (via Lua)   | Converted via Lua script to `options.num_predict`               |
-| `seed`                     | ❌ No               | Must be sent manually via native Ollama API only                |
-| `min_p`, `typical_p`       | ❌ No               | Not available in OpenAI spec                                    |
-| `repeat_penalty`           | ❌ No               | Only supported in native Ollama `options`                       |
-| `num_keep`                 | ❌ No               | Not mapped or exposed                                           |
-| `repeat_last_n`           | ❌ No               | Not available in OpenAI style                                   |
-| `mirostat`, `mirostat_tau`, `mirostat_eta` | ❌ No        | Not supported                                                   |
-| `num_ctx`                  | ❌ No               | Could be approximated using `max_tokens`, but not mapped        |
-| `num_batch`, `num_gpu`, `main_gpu` | ❌ No        | Performance-only settings, must be passed via native `options`  |
-| `numa`, `use_mmap`         | ❌ No               | Hardware-related flags                                          |
-| `penalize_newline`         | ❌ No               | Not part of OpenAI SDK spec                                     |
+The container uses the following configuration:
+- **Timezone**: Asia/Taipei
+- **Exposed Port**: 80 (mapped to 8080 on host)
+- **Log Location**: `/var/log/nginx/`
 
-> ✅ Options marked as "Yes" are automatically converted to Ollama-compatible format using the built-in `openai_to_ollama.lua` rewrite hook in Nginx.
+### Volumes
 
----
+- `./conf.d:/etc/nginx/conf.d` - Server configurations
+- `./other_tools:/etc/nginx/other_tools` - Additional tools
 
-## 🛠 Developer Notes
+## Performance Settings
 
-This proxy includes a Lua middleware that transparently rewrites OpenAI-style JSON bodies into Ollama-compatible format, specifically transforming:
+The configuration includes optimized settings for handling AI model requests:
 
-- `max_tokens` → `options.num_predict`
-- Flat parameters (`temperature`, `top_p`, etc.) → nested `options`
+- **Worker Processes**: Auto-scaled based on CPU cores
+- **Worker Connections**: 8192 per worker
+- **Client Max Body Size**: 100MB
+- **Proxy Timeouts**: 600 seconds for large model operations
+- **Keep-Alive**: 65 seconds
 
-This allows any client using the OpenAI SDK (e.g. LangChain, LlamaIndex, etc.) to communicate with Ollama models directly.
+## Development
 
----
+### Building the Image
 
-## 📄 License
+```bash
+docker build -t nginx-ollama .
+```
 
-Apache License 2.0
+### Running with Custom Configuration
+
+```bash
+docker run -d \
+  -p 8080:80 \
+  -v $(pwd)/conf.d:/etc/nginx/conf.d \
+  -v $(pwd)/other_tools:/etc/nginx/other_tools \
+  nginx-ollama
+```
+
+## License
+
+This project is licensed under the Apache License 2.0. See the [LICENSE](LICENSE) file for details.
+
+## Contributing
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## Support
+
+For issues and questions, please open an issue in the repository.
