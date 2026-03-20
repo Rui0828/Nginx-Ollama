@@ -40,8 +40,13 @@ A containerized Nginx reverse proxy setup using OpenResty for managing Ollama se
 ├── Dockerfile
 ├── docker-compose.yml
 ├── nginx.conf
-├── conf.d/           # Your server configurations go here
-└── other_tools/      # Additional tools and scripts
+├── conf.d/                        # Your server configurations go here
+└── other_tools/ollama/
+    ├── check_key.lua              # API key authentication & authorization
+    ├── admin_keys.txt             # Admin keys (git-ignored)
+    ├── admin_keys.txt.example     # Admin keys example
+    ├── inference_keys.txt         # Inference-only keys (git-ignored)
+    └── inference_keys.txt.example # Inference-only keys example
 ```
 
 ### Adding Server Configurations
@@ -93,11 +98,25 @@ print(response.choices[0].message.content)
 
 ## API Key Authentication
 
-This setup includes a robust API key authentication system for securing access to your Ollama services.
+This setup includes a two-tier API key authentication system for securing access to your Ollama services.
 
-### How It Works
+### Permission Levels
 
-The authentication is implemented using OpenResty's Lua scripting capability through `check_key.lua`. It validates API keys against a whitelist stored in `other_tools/ollama/keys.txt`.
+| Level | Allowed Operations |
+|-------|-------------------|
+| **Admin** | All operations, including model management (`pull`, `push`, `create`, `copy`, `delete`, `blobs`) |
+| **Inference** | Inference (`generate`, `chat`, `embed`) and read-only info (`tags`, `ps`, `show`, `version`) |
+
+### Setup
+
+Copy the example files and add your keys:
+
+```bash
+cp other_tools/ollama/admin_keys.txt.example other_tools/ollama/admin_keys.txt
+cp other_tools/ollama/inference_keys.txt.example other_tools/ollama/inference_keys.txt
+```
+
+Edit each file with one key per line. The actual key files are git-ignored.
 
 ### Supported Authentication Methods
 
@@ -105,39 +124,25 @@ The system supports multiple ways to provide your API key:
 
 1. **X-API-Key Header** (recommended):
    ```bash
-   curl -H "X-API-Key: your-secret-key" http://localhost:8080/ollama/api/tags
+   curl -H "X-API-Key: your-key" http://localhost:8080/ollama/api/tags
    ```
 
 2. **Authorization Bearer Token**:
    ```bash
-   curl -H "Authorization: Bearer your-secret-key" http://localhost:8080/ollama/api/tags
+   curl -H "Authorization: Bearer your-key" http://localhost:8080/ollama/api/tags
    ```
 
 3. **Query Parameter**:
    ```bash
-   curl "http://localhost:8080/ollama/api/tags?api_key=your-secret-key"
+   curl "http://localhost:8080/ollama/api/tags?api_key=your-key"
    ```
 
 ### Managing API Keys
 
-1. **Add/Remove Keys**: Edit the `other_tools/ollama/keys.txt` file:
-   ```
-   your-secret-key
-   abc123
-   supersecret
-   another-key-here
-   ```
-
-2. **Restart Required**: After modifying keys, restart the container:
-   ```bash
-   docker-compose restart nginx
-   ```
-
-3. **Security Best Practices**:
-   - Use strong, randomly generated keys
-   - Regularly rotate your API keys
-   - Keep the `keys.txt` file secure and backed up
-   - Consider using environment variables for production deployments
+After modifying key files, restart the container:
+```bash
+docker-compose restart nginx
+```
 
 ### CORS Handling
 
@@ -145,8 +150,8 @@ The authentication system automatically allows `OPTIONS` preflight requests to p
 
 ### Error Responses
 
-- **401 Unauthorized**: Returned when no API key is provided or the key is invalid
-- **Error Message**: `"Unauthorized: Invalid or missing API Key"`
+- **401 Unauthorized**: Invalid or missing API key
+- **403 Forbidden**: Inference key attempted a model management operation
 
 ## Configuration
 

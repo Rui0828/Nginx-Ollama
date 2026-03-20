@@ -1,1 +1,4 @@
 .DS_Store
+other_tools/ollama/admin_keys.txt
+other_tools/ollama/inference_keys.txt
+other_tools/ollama/keys.txt
